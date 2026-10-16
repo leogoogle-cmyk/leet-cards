@@ -7,28 +7,40 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Node.js
+    
+    - name: Set up Node.js (2026 Node24 Standard)
       uses: actions/setup-node@v4
       with:
-        node-version: 20
-        cache: 'npm'
+        node-version: 24
+        
     - name: Install Dependencies
       run: |
-        npm ci
-    - name: Build Web App and Sync
+        npm install
+        
+    - name: Web App Production Build
       run: |
         npm run build
-        npx cap sync
-    - name: Build Xcode Project
+        
+    - name: Force Capacitor Sync
+      run: |
+        npx cap sync ios
+        
+    - name: Compile Unsigned App Package via Xcode CLI
       run: |
         cd ios/App
-        xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates ARCHS=arm64 CODE_SIGNING_ALLOWED=NO
-    - name: Create Unsigned IPA Package
+        xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build PROVISIONING_PROFILE_SPECIFIER=""
+        
+    - name: Compress App Package into IPA Structure
       run: |
         mkdir -p Payload
-        cp -r ios/App/build/Release-iphoneos/App.app Payload/
+        if [ -d "ios/App/build/Debug-iphoneos/App.app" ]; then
+          cp -r ios/App/build/Debug-iphoneos/App.app Payload/
+        else
+          cp -r ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug-iphoneos/App.app Payload/
+        fi
         zip -r LeetCards_Unsigned.ipa Payload
-    - name: Upload IPA Artifact
+        
+    - name: Export Output IPA Archive
       uses: actions/upload-artifact@v4
       with:
         name: LeetCards-iOS-Package
